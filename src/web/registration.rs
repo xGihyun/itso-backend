@@ -1,12 +1,9 @@
-use axum::{extract::State, response::Result, Form, Json, Router};
+use axum::{extract::State, response::Result, Json};
 use serde::{Deserialize, Serialize};
-use sqlx::types::chrono::NaiveDate;
 use sqlx::PgPool;
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct User {
-    // id: i64,
-    // created_at: String,
+pub struct Participant {
     first_name: String,
     middle_name: String,
     last_name: String,
@@ -15,25 +12,31 @@ pub struct User {
     category: String,
 }
 
-pub async fn register(State(pool): State<PgPool>, Json(user): Json<User>) -> Result<Json<User>> {
-    let query = "INSERT INTO users (first_name, middle_name, last_name, school, coach_name, category) VALUES ($1, $2, $3, $4, $5, $6)";
+pub async fn register(
+    State(pool): State<PgPool>,
+    Json(users): Json<Vec<Participant>>,
+) -> Result<Json<Vec<Participant>>> {
+    let query = "INSERT INTO participants (first_name, middle_name, last_name, school, coach_name, category) VALUES ($1, $2, $3, $4, $5, $6)";
 
-    // let parsed_created_at_date =
-    //     sqlx::types::chrono::DateTime::parse_from_str(&user.created_at, "%Y-%m-%d %H:%M:%S %z")
-    //         .expect("Date and time is invalid.");
+    let mut transaction = pool.begin().await.expect("Failed to start transaction.");
 
-    sqlx::query(query)
-        // .bind(&user.id)
-        // .bind(parsed_created_at_date)
-        .bind(&user.first_name)
-        .bind(&user.middle_name)
-        .bind(&user.last_name)
-        .bind(&user.school)
-        .bind(&user.coach_name)
-        .bind(&user.category)
-        .execute(&pool)
+    for user in users.iter() {
+        sqlx::query(query)
+            .bind(&user.first_name)
+            .bind(&user.middle_name)
+            .bind(&user.last_name)
+            .bind(&user.school)
+            .bind(&user.coach_name)
+            .bind(&user.category)
+            .execute(&mut *transaction)
+            .await
+            .expect("Failed to register user.");
+    }
+
+    transaction
+        .commit()
         .await
-        .expect("Failed to register user.");
+        .expect("Failed to commit transaction.");
 
-    Ok(Json(user))
+    Ok(Json(users))
 }
