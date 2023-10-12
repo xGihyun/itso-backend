@@ -17,73 +17,73 @@ pub async fn generate_excel(State(pool): State<PgPool>) -> Result<Vec<u8>> {
 
     let mut book = new_file();
     let sheet = "Sheet1";
+    let headers = vec![
+        "Category",
+        "School",
+        "First Name",
+        "Middle Name",
+        "Last Name",
+        "Coach Name",
+        "Coach Email",
+        "Coach Contact Number",
+    ];
 
-    write_data(
-        &mut book,
-        sheet,
-        "A1",
-        Value::Text("First Name".to_string()),
-    );
-    write_data(
-        &mut book,
-        sheet,
-        "B1",
-        Value::Text("Middle Name".to_string()),
-    );
-    write_data(&mut book, sheet, "C1", Value::Text("Last Name".to_string()));
-    write_data(&mut book, sheet, "D1", Value::Text("School".to_string()));
-    write_data(
-        &mut book,
-        sheet,
-        "E1",
-        Value::Text("Coach Name".to_string()),
-    );
-    write_data(&mut book, sheet, "F1", Value::Text("Category".to_string()));
+    for (i, header) in headers.iter().enumerate() {
+        let column_letter = (b'A' + i as u8) as char;
+        let cell_address = format!("{}1", column_letter);
+
+        write_data(
+            &mut book,
+            sheet,
+            &cell_address,
+            Value::Text(header.to_string()),
+        );
+
+        let get_sheet = book.get_sheet_by_name_mut(sheet);
+
+        match get_sheet {
+            Ok(sheet) => {
+                let style = sheet.get_style_mut(cell_address);
+                style.get_font_mut().set_bold(true);
+            }
+            Err(err) => {
+                eprintln!("Failed to set font style to bold: {err:?}");
+            }
+        }
+    }
 
     for (i, row) in rows.iter().enumerate() {
-        let first_name: String = row.get("first_name");
-        let middle_name: String = row.get("middle_name");
-        let last_name: String = row.get("last_name");
-        let school: String = row.get("school");
-        let coach_name: String = row.get("coach_name");
-        let category: String = row.get("category");
+        let fields = vec![
+            "category",
+            "school",
+            "first_name",
+            "middle_name",
+            "last_name",
+            "coach_name",
+            "coach_email",
+            "coach_contact_number",
+        ];
 
-        write_data(
-            &mut book,
-            sheet,
-            format!("A{}", i + 2).as_ref(),
-            Value::Text(first_name),
-        );
-        write_data(
-            &mut book,
-            sheet,
-            format!("B{}", i + 2).as_ref(),
-            Value::Text(middle_name),
-        );
-        write_data(
-            &mut book,
-            sheet,
-            format!("C{}", i + 2).as_ref(),
-            Value::Text(last_name),
-        );
-        write_data(
-            &mut book,
-            sheet,
-            format!("D{}", i + 2).as_ref(),
-            Value::Text(school),
-        );
-        write_data(
-            &mut book,
-            sheet,
-            format!("E{}", i + 2).as_ref(),
-            Value::Text(coach_name),
-        );
-        write_data(
-            &mut book,
-            sheet,
-            format!("F{}", i + 2).as_ref(),
-            Value::Text(category),
-        );
+        for (j, field) in fields.iter().enumerate() {
+            let value: String = row.get(field);
+            let column_letter = (b'A' + j as u8) as char;
+            let cell_address = format!("{}{}", column_letter, i + 2);
+
+            write_data(&mut book, sheet, &cell_address, Value::Text(value));
+
+            let get_sheet = book.get_sheet_by_name_mut(sheet);
+
+            match get_sheet {
+                Ok(sheet) => {
+                    sheet
+                        .get_column_dimension_mut(column_letter.to_string().as_ref())
+                        .set_auto_width(true);
+                }
+                Err(err) => {
+                    eprintln!("Failed to set column auto width: {err:?}");
+                }
+            }
+        }
 
         println!("Successfully set values.");
     }
@@ -109,6 +109,7 @@ fn write_data(book: &mut Spreadsheet, sheet: &str, coordinate: &str, value: Valu
     match get_sheet {
         Ok(sheet) => {
             let cell = sheet.get_cell_mut(coordinate);
+
             match value {
                 Value::Text(s) => {
                     cell.set_value(s);
