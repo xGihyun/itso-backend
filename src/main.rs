@@ -21,7 +21,7 @@ use tower_http::cors::CorsLayer;
 
 mod web;
 
-use web::{excel, registration};
+use web::{email, excel, registration};
 
 #[shuttle_runtime::main]
 async fn axum(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> shuttle_axum::ShuttleAxum {
@@ -46,6 +46,7 @@ async fn axum(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> shuttle_
         // .with_state(oauth_client)
         .route("/", get(hello_world))
         .route("/register", post(registration::register))
+        .route("/email", post(email::send_email))
         .route("/download", get(excel::generate_excel))
         .layer(
             CorsLayer::new()
