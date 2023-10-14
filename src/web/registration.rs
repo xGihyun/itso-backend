@@ -1,4 +1,4 @@
-use axum::{extract::State, response::Result, Json};
+use axum::{extract::State, http, response::Result};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
@@ -16,8 +16,8 @@ pub struct Participant {
 
 pub async fn register(
     State(pool): State<PgPool>,
-    Json(users): Json<Vec<Participant>>,
-) -> Result<Json<Vec<Participant>>> {
+    axum::Json(users): axum::Json<Vec<Participant>>,
+) -> Result<(http::StatusCode, axum::Json<Vec<Participant>>), http::StatusCode> {
     let query = "INSERT INTO participants (category, school, first_name, middle_name, last_name, coach_name, coach_email, coach_contact_number) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)";
 
     let start_transaction = pool.begin().await;
@@ -25,7 +25,7 @@ pub async fn register(
     match start_transaction {
         Ok(mut transaction) => {
             for user in users.iter() {
-                sqlx::query(query)
+                let res = sqlx::query(query)
                     .bind(&user.category)
                     .bind(&user.school)
                     .bind(&user.first_name)
@@ -35,17 +35,29 @@ pub async fn register(
                     .bind(&user.coach_email)
                     .bind(&user.coach_contact_number)
                     .execute(&mut *transaction)
-                    .await
-                    .expect("Failed to register user.");
+                    .await;
+
+                if let Err(err) = res {
+                    eprintln!("Failed to insert user: {}", err);
+
+                    if let Err(err) = transaction.rollback().await {
+                        eprintln!("Failed to rollback transaction: {}", err);
+                    }
+
+                    return Err(http::StatusCode::INTERNAL_SERVER_ERROR);
+                }
             }
 
-            transaction
-                .commit()
-                .await
-                .expect("Failed to commit transaction.");
-        }
-        Err(err) => eprintln!("Failed to start transaction: {err:?}"),
-    }
+            if let Err(err) = transaction.commit().await {
+                eprintln!("Failed to commit transaction: {}", err);
+                return Err(http::StatusCode::INTERNAL_SERVER_ERROR);
+            }
 
-    Ok(Json(users))
+            return Ok((http::StatusCode::CREATED, axum::Json(users)));
+        }
+        Err(err) => {
+            eprintln!("Failed to start transaction: {}", err);
+            return Err(http::StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    }
 }

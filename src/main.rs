@@ -1,65 +1,114 @@
 // #![allow(unused_imports)]
 
-use anyhow::anyhow;
 use axum::{
-    // extract::{Query, State},
-    http::{HeaderValue, Method},
-    // response::{Response, Result},
+    http,
     routing::{get, post},
     Router,
 };
-// use oauth2::{
-//     basic::BasicClient, reqwest::async_http_client, AuthUrl, AuthorizationCode, ClientId,
-//     ClientSecret, CsrfToken, PkceCodeChallenge, RedirectUrl, RevocationUrl, Scope, TokenResponse,
-//     TokenUrl,
-// };
-// use reqwest::header::AUTHORIZATION;
-// use serde::{Deserialize, Serialize};
-use shuttle_secrets::SecretStore;
+use dotenv::dotenv;
+// use shuttle_secrets::SecretStore;
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
 
 mod web;
 
-use web::{email, excel, registration};
+use web::{email, excel, models, registration};
 
-#[shuttle_runtime::main]
-async fn axum(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> shuttle_axum::ShuttleAxum {
-    let db_url = if let Some(db_url) = secret_store.get("DATABASE_URL") {
-        db_url
-    } else {
-        return Err(anyhow!("DATABASE_URL not found.").into());
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
+    dotenv().ok();
+
+    let db_url = std::env::var("DATABASE_URL")?;
+
+    let pool = sqlx::postgres::PgPool::connect(&db_url).await?;
+
+    println!("\nSuccessfully connect to Postgres.");
+
+    let email_addr = std::env::var("EMAIL_ADDRESS")?;
+    let email_pass = std::env::var("EMAIL_PASSWORD")?;
+
+    let email_credentials = models::EmailCredentials {
+        address: email_addr,
+        password: email_pass,
     };
 
-    let pool = sqlx::postgres::PgPool::connect(&db_url)
-        .await
-        .expect("Can't connect to database.");
-
-    println!("\nNow listening to Postgres...");
-
-    // let oauth_client = oauth_client(&secret_store).expect("Failed to get OAuth client");
-
     let app = Router::new()
-        // .route("/auth/login", post(auth::login))
-        // .route("/auth/register", post(auth::register))
-        // .route("/login/test", get(fetch_user_info))
-        // .with_state(oauth_client)
         .route("/", get(hello_world))
         .route("/register", post(registration::register))
-        .route("/email", post(email::send_email))
         .route("/download", get(excel::generate_excel))
         .layer(
             CorsLayer::new()
-                .allow_origin("*".parse::<HeaderValue>().unwrap())
-                .allow_methods([Method::GET, Method::POST]),
+                .allow_origin("*".parse::<http::HeaderValue>()?)
+                .allow_methods([http::Method::GET, http::Method::POST]),
         )
-        .with_state(pool);
+        .with_state(pool)
+        .route("/email", post(email::send_email))
+        .with_state(email_credentials);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
+    let port: u16 = std::env::var("PORT")
+        .unwrap_or_else(|_| "8000".to_string())
+        .parse()?;
+
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
 
     println!("Server has started, listening on: {}", addr);
 
-    Ok(app.into())
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await?;
+
+    Ok(())
+}
+
+// #[shuttle_runtime::main]
+// async fn axum(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> shuttle_axum::ShuttleAxum {
+//     let db_url = secret_store
+//         .get("DATABASE_URL")
+//         .ok_or_else(|| anyhow!("DATABASE_URL not found."))?;
+//
+//     let pool = sqlx::postgres::PgPool::connect(&db_url)
+//         .await
+//         .map_err(|_| anyhow!("Could not connect to database."))?;
+//
+//     println!("\nNow listening to Postgres...");
+//
+//     let email_addr = secret_store
+//         .get("EMAIL_ADDRESS")
+//         .ok_or_else(|| anyhow!("EMAIL_ADDRESS not found."))?;
+//
+//     let email_pass = secret_store
+//         .get("EMAIL_PASSWORD")
+//         .ok_or_else(|| anyhow!("EMAIL_ADDRESS not found."))?;
+//
+//     let email_credentials = models::EmailCredentials {
+//         address: email_addr,
+//         password: email_pass,
+//     };
+//
+//     let app = Router::new()
+//         .route("/", get(hello_world))
+//         .route("/register", post(registration::register))
+//         .route("/download", get(excel::generate_excel))
+//         .layer(
+//             CorsLayer::new()
+//                 .allow_origin("*".parse::<http::HeaderValue>().unwrap())
+//                 .allow_methods([http::Method::GET, http::Method::POST]),
+//         )
+//         .with_state(pool)
+//         .route("/email", post(email::send_email))
+//         .with_state(email_credentials);
+//
+//     let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
+//
+//     println!("Server has started, listening on: {}", addr);
+//
+//     Ok(app.into())
+// }
+
+async fn hello_world() -> http::StatusCode {
+    println!("Hello, World!");
+
+    http::StatusCode::OK
 }
 
 // fn oauth_client(secret_store: &SecretStore) -> Result<BasicClient, anyhow::Error> {
@@ -197,7 +246,3 @@ async fn axum(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> shuttle_
 //
 //     "Hello".to_string()
 // }
-
-async fn hello_world() -> &'static str {
-    "Hello, World!"
-}

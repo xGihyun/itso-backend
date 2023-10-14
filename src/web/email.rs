@@ -1,18 +1,29 @@
 use axum::body::Bytes;
-// use axum::response::{IntoResponse, Result};
+use axum::extract::State;
+use axum::http;
 use lettre::message::header::{ContentDisposition, ContentType};
 use lettre::message::SinglePart;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
-use reqwest::StatusCode;
 
-pub async fn send_email(image: Bytes) -> StatusCode {
+use super::models;
+
+pub async fn send_email(
+    State(email): State<models::EmailCredentials>,
+    image: Bytes,
+) -> Result<http::StatusCode, http::StatusCode> {
     println!("Sending receipt...");
 
-    let sender = "IT Olympics <giordnnuz27@gmail.com>"
+    let address = email.address.to_owned();
+    let password = email.password.to_owned();
+
+    let sender = format!("Sender <{address}>")
         .parse()
         .expect("Failed to parse sender.");
-    let receiver = "Gihyun <giordnnuz@gmail.com>"
+
+    // TODO: Make sure to hide receiver's address
+    // Change it to the official receiver
+    let receiver = format!("Receiver <{address}>")
         .parse()
         .expect("Failed to parse receiver.");
 
@@ -29,29 +40,25 @@ pub async fn send_email(image: Bytes) -> StatusCode {
 
     match create_message {
         Ok(email) => {
-            let creds = Credentials::new(
-                "giordnnuz27@gmail.com".to_owned(),
-                "myqu jeyf unsv zysg".to_owned(),
-            );
+            let creds = Credentials::new(address, password);
 
             let mailer = SmtpTransport::relay("smtp.gmail.com")
-                .unwrap()
+                .expect("SMTP relay error.")
                 .credentials(creds)
                 .build();
 
-            let send_email = mailer.send(&email);
-
-            match send_email {
-                Ok(_) => {
-                    println!("Email sent successfully!");
-                }
-                Err(err) => {
-                    eprintln!("Failed to send email: {err:?}");
-                }
+            if let Err(err) = mailer.send(&email) {
+                eprintln!("Failed to send email: {err:?}");
+                return Err(http::StatusCode::INTERNAL_SERVER_ERROR);
             }
-        }
-        Err(err) => eprintln!("Failed to create message: {err:?}"),
-    }
 
-    StatusCode::OK
+            println!("Email sent successfully!");
+
+            Ok(http::StatusCode::OK)
+        }
+        Err(err) => {
+            eprintln!("Failed to create message: {err:?}");
+            Err(http::StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }
