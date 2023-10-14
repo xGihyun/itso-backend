@@ -45,11 +45,17 @@ async fn main() -> Result<(), anyhow::Error> {
         .route("/email", post(email::send_email))
         .with_state(email_credentials);
 
+    // let port: u16 = std::env::var("PORT")
+    //     .unwrap_or_else(|_| "8000".to_string())
+    //     .parse()?;
+
+    // let addr = SocketAddr::from(([127, 0, 0, 1], port));
+
     let port: u16 = std::env::var("PORT")
         .unwrap_or_else(|_| "8000".to_string())
         .parse()?;
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let addr = format!("0.0.0.0:{port}").parse()?;
 
     println!("Server has started, listening on: {}", addr);
 
