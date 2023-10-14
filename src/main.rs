@@ -6,8 +6,6 @@ use axum::{
     Router,
 };
 use dotenv::dotenv;
-// use shuttle_secrets::SecretStore;
-use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
 
 mod web;
@@ -45,15 +43,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .route("/email", post(email::send_email))
         .with_state(email_credentials);
 
-    // let port: u16 = std::env::var("PORT")
-    //     .unwrap_or_else(|_| "8000".to_string())
-    //     .parse()?;
-
-    // let addr = SocketAddr::from(([127, 0, 0, 1], port));
-
-    let port: u16 = std::env::var("PORT")
-        .unwrap_or_else(|_| "8000".to_string())
-        .parse()?;
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8000".to_string());
 
     let addr = format!("0.0.0.0:{port}").parse()?;
 
@@ -66,6 +56,16 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn hello_world() -> http::StatusCode {
+    println!("Hello, World!");
+
+    http::StatusCode::OK
+}
+
+// NOTE: IF USING SHUTTLE, USE THE MAIN FUNCTION BELOW
+
+// use shuttle_secrets::SecretStore;
+//
 // #[shuttle_runtime::main]
 // async fn axum(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> shuttle_axum::ShuttleAxum {
 //     let db_url = secret_store
@@ -110,12 +110,6 @@ async fn main() -> Result<(), anyhow::Error> {
 //
 //     Ok(app.into())
 // }
-
-async fn hello_world() -> http::StatusCode {
-    println!("Hello, World!");
-
-    http::StatusCode::OK
-}
 
 // fn oauth_client(secret_store: &SecretStore) -> Result<BasicClient, anyhow::Error> {
 //     let google_client_id = ClientId::new(

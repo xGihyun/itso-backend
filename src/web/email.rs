@@ -3,8 +3,8 @@ use axum::extract::State;
 use axum::http;
 use lettre::message::header::{ContentDisposition, ContentType};
 use lettre::message::SinglePart;
-use lettre::transport::smtp::authentication::Credentials;
-use lettre::{Message, SmtpTransport, Transport};
+use lettre::transport::smtp::{authentication::Credentials, AsyncSmtpTransport};
+use lettre::{AsyncTransport, Message, Tokio1Executor};
 
 use super::models;
 
@@ -27,6 +27,13 @@ pub async fn send_email(
         .parse()
         .expect("Failed to parse receiver.");
 
+    let creds = Credentials::new(address, password);
+    let mailer: AsyncSmtpTransport<Tokio1Executor> =
+        AsyncSmtpTransport::<Tokio1Executor>::relay("smtp.gmail.com")
+            .expect("SMTP relay error.")
+            .credentials(creds)
+            .build();
+
     let create_message = Message::builder()
         .from(sender)
         .to(receiver)
@@ -40,17 +47,7 @@ pub async fn send_email(
 
     match create_message {
         Ok(email) => {
-            let creds = Credentials::new(address, password);
-
-            let mailer = SmtpTransport::relay("smtp.gmail.com")
-                .expect("SMTP relay error.")
-                .credentials(creds)
-                .build();
-
-            if let Err(err) = mailer.send(&email) {
-                eprintln!("Failed to send email: {err:?}");
-                return Err(http::StatusCode::INTERNAL_SERVER_ERROR);
-            }
+            mailer.send(email).await.expect("Failed to send email.");
 
             println!("Email sent successfully!");
 

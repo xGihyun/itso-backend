@@ -53,11 +53,11 @@ pub async fn register(
                 return Err(http::StatusCode::INTERNAL_SERVER_ERROR);
             }
 
-            return Ok((http::StatusCode::CREATED, axum::Json(users)));
+            Ok((http::StatusCode::CREATED, axum::Json(users)))
         }
         Err(err) => {
             eprintln!("Failed to start transaction: {}", err);
-            return Err(http::StatusCode::INTERNAL_SERVER_ERROR);
+            Err(http::StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
