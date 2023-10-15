@@ -1,6 +1,6 @@
 use axum::{extract::State, http, response::Result};
 use sqlx::{PgPool, Row};
-use umya_spreadsheet::*;
+use umya_spreadsheet::{new_file, writer, Spreadsheet};
 
 enum Value {
     Number(i32),

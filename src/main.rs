@@ -1,5 +1,7 @@
 // #![allow(unused_imports)]
 
+use std::net::SocketAddr;
+
 use axum::{
     http,
     routing::{get, post},
@@ -10,7 +12,7 @@ use tower_http::cors::CorsLayer;
 
 mod web;
 
-use web::{email, excel, models, registration};
+use web::{email, excel, registration};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -22,30 +24,30 @@ async fn main() -> Result<(), anyhow::Error> {
 
     println!("\nSuccessfully connect to Postgres.");
 
-    let email_addr = std::env::var("EMAIL_ADDRESS")?;
-    let email_pass = std::env::var("EMAIL_PASSWORD")?;
-
-    let email_credentials = models::EmailCredentials {
-        address: email_addr,
-        password: email_pass,
-    };
+    // let email_addr = std::env::var("EMAIL_ADDRESS")?;
+    // let email_pass = std::env::var("EMAIL_PASSWORD")?;
+    //
+    // let email_credentials = models::EmailCredentials {
+    //     address: email_addr,
+    //     password: email_pass,
+    // };
 
     let app = Router::new()
         .route("/", get(hello_world))
         .route("/register", post(registration::register))
         .route("/download", get(excel::generate_excel))
+        .route("/email", post(email::send_email))
         .layer(
             CorsLayer::new()
                 .allow_origin("*".parse::<http::HeaderValue>()?)
                 .allow_methods([http::Method::GET, http::Method::POST]),
         )
-        .with_state(pool)
-        .route("/email", post(email::send_email))
-        .with_state(email_credentials);
+        .with_state(pool);
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "8000".to_string());
 
-    let addr = format!("0.0.0.0:{port}").parse()?;
+    // let addr = format!("0.0.0.0:{port}").parse()?;
+    let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
 
     println!("Server has started, listening on: {}", addr);
 
