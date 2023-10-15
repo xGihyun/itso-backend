@@ -46,8 +46,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "8000".to_string());
 
-    // let addr = format!("0.0.0.0:{port}").parse()?;
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
+    let addr = format!("0.0.0.0:{port}").parse()?;
+    // let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
 
     println!("Server has started, listening on: {}", addr);
 
