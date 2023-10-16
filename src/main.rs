@@ -1,7 +1,5 @@
 // #![allow(unused_imports)]
 
-use std::net::SocketAddr;
-
 use axum::{
     http,
     routing::{get, post},
@@ -12,7 +10,7 @@ use tower_http::cors::CorsLayer;
 
 mod web;
 
-use web::{email, excel, registration};
+use web::{excel, registration};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -24,19 +22,11 @@ async fn main() -> Result<(), anyhow::Error> {
 
     println!("\nSuccessfully connect to Postgres.");
 
-    // let email_addr = std::env::var("EMAIL_ADDRESS")?;
-    // let email_pass = std::env::var("EMAIL_PASSWORD")?;
-    //
-    // let email_credentials = models::EmailCredentials {
-    //     address: email_addr,
-    //     password: email_pass,
-    // };
-
     let app = Router::new()
         .route("/", get(hello_world))
         .route("/register", post(registration::register))
         .route("/download", get(excel::generate_excel))
-        .route("/email", post(email::send_email))
+        // .route("/email", post(email::send_email))
         .layer(
             CorsLayer::new()
                 .allow_origin("*".parse::<http::HeaderValue>()?)
